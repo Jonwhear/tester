@@ -153,12 +153,47 @@ function parseAnswerKey(value: unknown): string[] | undefined {
   return parts.length > 0 ? parts : undefined;
 }
 
+/**
+ * Resolve an answer-key token against the question's actual option labels.
+ *
+ * Multi-answer keys are written two ways in the wild: separated ("E, F, H")
+ * and run together ("EFH"). A run-together key cannot be split blindly, because
+ * a label may legitimately be more than one character ("iii", "AB"). So a token
+ * is kept whole when it matches an option label, and only split into single
+ * characters when the whole token matches nothing AND every character matches
+ * an option label. Anything else is left alone and reported as unknown.
+ */
+export function expandAnswerKey(tokens: string[], optionLabels: string[]): string[] {
+  const known = new Set(optionLabels.map((label) => label.trim().toUpperCase()));
+  const expanded: string[] = [];
+
+  tokens.forEach((token) => {
+    const normalized = token.trim().toUpperCase();
+    if (normalized === '') return;
+    if (known.has(normalized)) {
+      expanded.push(token.trim());
+      return;
+    }
+    const characters = [...normalized];
+    if (characters.length > 1 && characters.every((character) => known.has(character))) {
+      expanded.push(...characters);
+      return;
+    }
+    expanded.push(token.trim());
+  });
+
+  // De-duplicate while preserving order; a key of "AA" is a typo, not two picks.
+  return expanded.filter((label, index) => expanded.indexOf(label) === index);
+}
+
 interface Draft {
   question: Question;
   rowIndex: number;
   optionRowIndexes: number[];
   explicitType: boolean;
   explicitSelectCount: boolean;
+  /** Set when multiple-select was inferred from the answer key's length. */
+  typeFromAnswerKey?: boolean;
 }
 
 /**
@@ -390,6 +425,53 @@ export function importRowFormat(input: unknown, options: RowImportOptions = {}):
   /* Per-question structural checks. */
   drafts.forEach((draft) => {
     const { question } = draft;
+    const optionLabels = question.options.map((option) => option.label);
+
+    /*
+     * The answer key can only be resolved once the option labels are known, so
+     * "EFH" becomes ["E","F","H"] here rather than at row-parse time.
+     */
+    if (question.correctAnswer && optionLabels.length > 0) {
+      const expanded = expandAnswerKey(question.correctAnswer, optionLabels);
+      if (expanded.length !== question.correctAnswer.length) {
+        issues.push({
+          level: 'warning',
+          rowIndex: draft.rowIndex,
+          questionId: question.id,
+          message:
+            `Answer key "${question.correctAnswer.join(', ')}" was read as ` +
+            `${expanded.length} separate options (${expanded.join(', ')}).`,
+        });
+      }
+      question.correctAnswer = expanded;
+    }
+
+    /*
+     * A key naming several options means the question is multiple-select, and
+     * says how many to pick. This is structural — it reads the source's own
+     * answer key rather than guessing anything about content — and only applies
+     * when the source did not state the type itself.
+     */
+    if (
+      !draft.explicitType &&
+      question.correctAnswer &&
+      question.correctAnswer.length > 1 &&
+      question.questionType === 'single'
+    ) {
+      question.questionType = 'multiple';
+      draft.typeFromAnswerKey = true;
+    }
+    if (
+      question.questionType === 'multiple' &&
+      question.selectCount === undefined &&
+      question.correctAnswer &&
+      question.correctAnswer.length > 1
+    ) {
+      question.selectCount = question.correctAnswer.length;
+    }
+    /* A single-select question carries no selectCount. */
+    if (question.questionType === 'single') delete question.selectCount;
+
     if (question.options.length === 0) {
       issues.push({
         level: 'error',
@@ -434,8 +516,11 @@ export function importRowFormat(input: unknown, options: RowImportOptions = {}):
         rowIndex: draft.rowIndex,
         questionId: question.id,
         message:
-          `Treated as multiple-select (selectCount ${question.selectCount}) because the stem contains ` +
-          'an explicit "select N" instruction. Add a question_type column to state this in the source.',
+          `Treated as multiple-select (selectCount ${question.selectCount}) because ` +
+          (draft.typeFromAnswerKey
+            ? `the answer key names ${question.correctAnswer?.length} options`
+            : 'the stem contains an explicit "select N" instruction') +
+          '. Add a question_type column to state this in the source.',
       });
     }
   });

@@ -1,14 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { FilePlus2, FolderOpen, Pencil } from 'lucide-react';
 
 import type { QuestionBank, StoredBank } from '../../types/question';
 import type { ImportIssue, ImportResult } from '../../data/normalize';
 import { bankParts, bankYears, describeBank } from '../../data/normalize';
 import { importNormalizedBank } from '../../data/importers/normalizedJson';
 import { importRowFormat } from '../../data/importers/rowFormat';
+import {
+  isJsonFilename,
+  isTabularFilename,
+  readTabularFile,
+  TabularError,
+  type TabularSource,
+} from '../../data/importers/tabular';
 import { deleteBank, listBanks, saveBank } from '../../storage/repositories';
 import { SAMPLE_BANK, SAMPLE_ROWS } from '../../sample-data';
 import { readFileAsText } from '../../utils/download';
+import { createEmptyBank } from '../../state/bankEditor';
+import { openJsonFile, supportsFileSystemAccess, type FileHandleLike } from '../../utils/fileSystem';
 import { ConfirmDialog } from '../common/ConfirmDialog';
+import { BankEditorScreen } from '../editor/BankEditorScreen';
 import { cn } from '../../utils/cn';
 
 export interface BankManagerScreenProps {
@@ -25,6 +36,23 @@ interface Preview {
   issues: ImportIssue[];
   years: number[];
   parts: string[];
+  /** Set when the preview came from a spreadsheet rather than JSON. */
+  source?: TabularSource;
+}
+
+interface EditingTarget {
+  bank: QuestionBank;
+  handle?: FileHandleLike | undefined;
+  fileName?: string | undefined;
+}
+
+/** Filename -> a stable, readable bank id. */
+function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
 }
 
 /** Choose the importer. `auto` reads the shape rather than trusting a label. */
@@ -51,6 +79,7 @@ export function BankManagerScreen({ onBack, onBanksChanged }: BankManagerScreenP
   const [status, setStatus] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<StoredBank | null>(null);
+  const [editing, setEditing] = useState<EditingTarget | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(async () => {
@@ -62,7 +91,7 @@ export function BankManagerScreen({ onBack, onBanksChanged }: BankManagerScreenP
   }, [refresh]);
 
   const accept = useCallback(
-    (payload: unknown, chosenFormat: Format) => {
+    (payload: unknown, chosenFormat: Format, source?: TabularSource) => {
       const result = runImport(payload, chosenFormat);
       setIssues(result.issues);
       if (!result.ok || !result.bank) {
@@ -78,6 +107,7 @@ export function BankManagerScreen({ onBack, onBanksChanged }: BankManagerScreenP
         years: bankYears(result.bank),
         parts: bankParts(result.bank),
         issues: result.issues,
+        ...(source ? { source } : {}),
       });
     },
     [],
@@ -86,6 +116,56 @@ export function BankManagerScreen({ onBack, onBanksChanged }: BankManagerScreenP
   const handleFile = useCallback(
     async (file: File) => {
       setStatus(null);
+      setError(null);
+
+      if (isTabularFilename(file.name)) {
+        try {
+          const source = await readTabularFile(file);
+          if (source.rows.length === 0) {
+            setPreview(null);
+            setIssues([]);
+            setError(`${file.name} has a header row but no data rows.`);
+            return;
+          }
+          /*
+           * A spreadsheet is always the row format; the JSON selector does not
+           * apply. It also carries no bank identity, so derive a readable one
+           * from the file and sheet rather than leaving a generic default the
+           * user then has to notice and fix.
+           */
+          const baseName = file.name.replace(/\.[^.]+$/, '').trim();
+          const title = source.sheetName && source.sheetName !== 'Sheet1'
+            ? `${baseName} — ${source.sheetName}`
+            : baseName;
+          accept(
+            {
+              rows: source.rows,
+              bankId: slugify(baseName) || 'imported-bank',
+              title: title || 'Imported question bank',
+            },
+            'rows',
+            source,
+          );
+        } catch (caught) {
+          setPreview(null);
+          setIssues([]);
+          setError(
+            caught instanceof TabularError ? caught.message : `Could not read ${file.name}.`,
+          );
+        }
+        return;
+      }
+
+      if (!isJsonFilename(file.name)) {
+        setPreview(null);
+        setIssues([]);
+        setError(
+          `${file.name} is not a supported file. Use .xlsx, .csv, .tsv or .json — ` +
+            'an Excel workbook can be dropped here directly.',
+        );
+        return;
+      }
+
       try {
         const text = await readFileAsText(file);
         accept(JSON.parse(text), format);
@@ -113,6 +193,56 @@ export function BankManagerScreen({ onBack, onBanksChanged }: BankManagerScreenP
     },
     [onBanksChanged, refresh],
   );
+
+  /** Open a bank JSON from disk, keeping a write handle where possible. */
+  const openForEditing = useCallback(async () => {
+    setError(null);
+    setStatus(null);
+    try {
+      const opened = await openJsonFile();
+      if (!opened) return;
+      const text = await opened.file.text();
+      const result = importNormalizedBank(JSON.parse(text));
+      if (!result.ok || !result.bank) {
+        setIssues(result.issues);
+        setError(`${opened.file.name} is not a valid question bank, so it was not opened.`);
+        return;
+      }
+      setIssues([]);
+      setEditing({
+        bank: result.bank,
+        handle: opened.handle,
+        fileName: opened.file.name,
+      });
+    } catch (caught) {
+      setError(
+        caught instanceof SyntaxError
+          ? 'That file is not valid JSON.'
+          : caught instanceof Error
+            ? caught.message
+            : 'Could not open that file.',
+      );
+    }
+  }, []);
+
+  if (editing) {
+    return (
+      <BankEditorScreen
+        initialBank={editing.bank}
+        initialHandle={editing.handle}
+        initialFileName={editing.fileName}
+        onClose={() => {
+          setEditing(null);
+          void refresh();
+        }}
+        onInstall={async (bank) => {
+          await saveBank(bank);
+          await refresh();
+          onBanksChanged?.();
+        }}
+      />
+    );
+  }
 
   return (
     <div className="screen">
@@ -154,7 +284,7 @@ export function BankManagerScreen({ onBack, onBanksChanged }: BankManagerScreenP
                   <th scope="col" style={{ width: 150 }}>
                     Imported
                   </th>
-                  <th scope="col" style={{ width: 90 }} />
+                  <th scope="col" style={{ width: 150 }} />
                 </tr>
               </thead>
               <tbody>
@@ -181,6 +311,14 @@ export function BankManagerScreen({ onBack, onBanksChanged }: BankManagerScreenP
                       <div className="bank-actions">
                         <button
                           type="button"
+                          className="btn btn--sm"
+                          title="Open this bank in the editor"
+                          onClick={() => setEditing({ bank: bank.bank })}
+                        >
+                          <Pencil size={12} aria-hidden="true" /> Edit
+                        </button>
+                        <button
+                          type="button"
                           className="btn btn--sm btn--danger"
                           onClick={() => setPendingDelete(bank)}
                         >
@@ -196,14 +334,37 @@ export function BankManagerScreen({ onBack, onBanksChanged }: BankManagerScreenP
         </section>
 
         <section style={{ marginBottom: 22 }}>
+          <h2 className="dialog__section-title">Edit</h2>
+          <div className="screen__actions" style={{ marginBottom: 8 }}>
+            <button type="button" className="btn" onClick={() => void openForEditing()}>
+              <FolderOpen size={13} aria-hidden="true" /> Open a bank file to edit…
+            </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => setEditing({ bank: createEmptyBank() })}
+            >
+              <FilePlus2 size={13} aria-hidden="true" /> Create a new bank
+            </button>
+          </div>
+          <p className="note">
+            The editor writes a question-bank JSON file you can keep, share or re-open later.
+            {supportsFileSystemAccess()
+              ? ' Saving writes back to the same file on your disk.'
+              : ' This browser cannot write files in place, so saving downloads a copy — Chrome or Edge can save directly.'}
+          </p>
+        </section>
+
+        <section style={{ marginBottom: 22 }}>
           <h2 className="dialog__section-title">Import</h2>
 
-          <div className="setting-row" style={{ maxWidth: 560, paddingBottom: 10 }}>
+          <div className="setting-row" style={{ maxWidth: 620, paddingBottom: 10 }}>
             <div className="setting-row__label">
-              Source format
+              JSON format
               <span className="setting-row__hint">
-                Auto-detect reads the file shape: an array or a <code>rows</code> property is
-                treated as the Excel row export.
+                Only applies to .json files. Auto-detect reads the shape: an array or a{' '}
+                <code>rows</code> property is treated as the row export. Spreadsheets are always
+                read as rows.
               </span>
             </div>
             <div className="segmented">
@@ -211,7 +372,7 @@ export function BankManagerScreen({ onBack, onBanksChanged }: BankManagerScreenP
                 [
                   ['auto', 'Auto'],
                   ['normalized', 'Normalized'],
-                  ['rows', 'Excel rows'],
+                  ['rows', 'Rows'],
                 ] as Array<[Format, string]>
               ).map(([value, label]) => (
                 <label className="segmented__option" key={value}>
@@ -241,7 +402,7 @@ export function BankManagerScreen({ onBack, onBanksChanged }: BankManagerScreenP
               if (file) void handleFile(file);
             }}
           >
-            Drop a question-bank JSON file here, or{' '}
+            Drop an Excel workbook (.xlsx), a .csv/.tsv export or a question-bank .json here, or{' '}
             <button
               type="button"
               className="btn btn--sm"
@@ -253,7 +414,7 @@ export function BankManagerScreen({ onBack, onBanksChanged }: BankManagerScreenP
             <input
               ref={fileRef}
               type="file"
-              accept="application/json,.json"
+              accept=".xlsx,.xlsm,.csv,.tsv,.json,application/json"
               className="sr-only"
               onChange={(event) => {
                 const file = event.target.files?.[0];
@@ -306,6 +467,26 @@ export function BankManagerScreen({ onBack, onBanksChanged }: BankManagerScreenP
         {preview ? (
           <section>
             <h2 className="dialog__section-title">Ready to install</h2>
+
+            {preview.source ? (
+              <p className="note" style={{ marginBottom: 10 }}>
+                Read {preview.source.rows.length} rows
+                {preview.source.sheetName ? ` from sheet “${preview.source.sheetName}”` : ''}
+                {preview.source.skippedEmptyRows > 0
+                  ? `, skipping ${preview.source.skippedEmptyRows} blank row(s)`
+                  : ''}
+                .
+                {preview.source.unrecognizedHeaders.length > 0
+                  ? ` Columns ignored: ${preview.source.unrecognizedHeaders.join(', ')}.`
+                  : ''}
+                {preview.source.sheetNames && preview.source.sheetNames.length > 1
+                  ? ` Other sheets in this workbook: ${preview.source.sheetNames
+                      .filter((name) => name !== preview.source?.sheetName)
+                      .join(', ')}.`
+                  : ''}
+              </p>
+            ) : null}
+
             <dl className="kv" style={{ marginBottom: 12 }}>
               <dt>Title</dt>
               <dd>{preview.bank.title}</dd>
@@ -330,6 +511,7 @@ export function BankManagerScreen({ onBack, onBanksChanged }: BankManagerScreenP
               <dt>Checksum</dt>
               <dd style={{ fontFamily: 'var(--font-mono)' }}>{preview.described.checksum}</dd>
             </dl>
+
             <div className="screen__actions">
               <button
                 type="button"
@@ -338,10 +520,23 @@ export function BankManagerScreen({ onBack, onBanksChanged }: BankManagerScreenP
               >
                 Install bank
               </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setEditing({ bank: preview.bank })}
+              >
+                <Pencil size={13} aria-hidden="true" /> Open in editor
+              </button>
               <button type="button" className="btn" onClick={() => setPreview(null)}>
                 Discard
               </button>
             </div>
+            {!preview.described.hasAnswerKey ? (
+              <p className="note note--warn" style={{ marginTop: 8 }}>
+                No answer key was found in this file. Open it in the editor and use{' '}
+                <strong>Key</strong> to apply one.
+              </p>
+            ) : null}
           </section>
         ) : null}
       </div>

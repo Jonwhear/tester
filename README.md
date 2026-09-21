@@ -17,6 +17,8 @@ banks and attempt progress live in IndexedDB on the machine you are using.
 - [Normalized question-bank schema](#normalized-question-bank-schema)
 - [Excel row-format compatibility](#excel-row-format-compatibility)
 - [Importing a bank](#importing-a-bank)
+- [Editing a bank](#editing-a-bank)
+- [Applying an answer key](#applying-an-answer-key)
 - [Where to put your generated JSON](#where-to-put-your-generated-json)
 - [Save and progress architecture](#save-and-progress-architecture)
 - [Exam mode vs Tutor mode](#exam-mode-vs-tutor-mode)
@@ -49,6 +51,8 @@ moment `npm run dev` comes up — no import step needed to try it.
 ## What it does
 
 - Load one or more question banks and keep them side by side (by id **and** version).
+- Import straight from Excel (`.xlsx`), CSV/TSV, or JSON — no conversion script needed.
+- Edit banks in a built-in authoring tool: fix text, set answer keys, attach images, save to disk.
 - Work through questions sequentially, jump from the left status rail, or use Previous/Next.
 - Single-select and multiple-select questions, with any number of options (A–D, A–E, A–H, …).
 - **Exam mode** (nothing revealed until submission) and **Tutor mode** (immediate feedback).
@@ -75,15 +79,18 @@ src/
     toolbar/              ExamToolbar, toolbarExtensions (optional-tool seam)
     dialogs/              Notes, LabValues, Calculator, Help, Finish, Settings,
                           BankManagerScreen
+    editor/               BankEditorScreen and friends (authoring; back-office only)
     review/               ReviewScreen, AttemptHistoryScreen
     start/                StartScreen, NewAttemptDialog
   data/
     schema.ts             Zod schemas — the ONLY place untrusted JSON is validated
     normalize.ts          checksums, bank summaries, shared import types
+    answerKey.ts          applying a separate answer-key list to a bank
     labValues.ts          lab-values reference data (replace this file)
     importers/
       normalizedJson.ts   importer for already-normalized QuestionBank JSON
       rowFormat.ts        adapter for the Excel row export
+      tabular.ts          .xlsx / .csv / .tsv entry point + column aliasing
   grading/
     grade.ts              pure grading functions; no React, no storage, no clock
   hooks/
@@ -93,6 +100,7 @@ src/
   state/
     attemptFactory.ts     attempt creation + bank-compatibility checks
     attemptReducer.ts     every attempt state transition, as pure functions
+    bankEditor.ts         every authoring edit + validation, as pure functions
     statusModel.ts        what the candidate is allowed to SEE about correctness
   storage/
     db.ts                 small promise wrapper over IndexedDB
@@ -101,7 +109,8 @@ src/
   sample-data/            bundled development fixtures (delete freely)
   styles/                 tokens.css + one stylesheet per area
   types/                  question.ts, attempt.ts, settings.ts
-  utils/                  id, hash, download, cn
+  utils/                  id, hash, download, cn, csv, xlsx, fileSystem, image
+  answer-keys/            plain-text answer keys kept alongside the code
 ```
 
 The separation that matters most: **UI components only ever see the normalized `QuestionBank`
@@ -316,16 +325,148 @@ option that is not present. Fix the spreadsheet, re-export, re-import.
 
 **Settings → Manage question banks**, or **Question Bank** on the start screen.
 
-1. Drop a JSON file on the drop zone, or choose one from disk.
-2. The format selector defaults to **Auto** — an array, or an object with a `rows` property, is
-   treated as the row export; anything else is treated as normalized JSON.
+1. Drop a file on the drop zone, or choose one from disk. Accepted:
+   - **`.xlsx` / `.xlsm`** — an Excel workbook in the row format. Read directly; no conversion
+     step. The first sheet is used, and the others are named in the summary.
+   - **`.csv` / `.tsv`** — the same row format exported as text.
+   - **`.json`** — either normalized bank JSON or row-format JSON.
+2. The format selector applies to `.json` only and defaults to **Auto** — an array, or an object
+   with a `rows` property, is treated as the row export; anything else is treated as normalized
+   JSON. Spreadsheets are always read as rows.
 3. The bank is validated and summarized (title, id, version, question count, years, parts, whether
    an answer key is present, content checksum) **before** anything is stored.
 4. Errors and warnings are listed with the question id and source row.
-5. Press **Install bank** to store it.
+5. Press **Install bank** to store it, or **Open in editor** to fix it up first.
+
+### Column names
+
+Headers are matched case-insensitively, ignoring spaces, hyphens and underscores, so
+`question_id`, `Question ID` and `question-id` are the same column. Each canonical column accepts
+several spellings — the answer key, for instance, is read from any of `correct_answer`, `answer`,
+`answers`, `answer_key`, `key`, `correct`, `correct_option`, `correct_label`, `correct_choice`,
+`ans` or `solution`. A column that is not recognized is passed through untouched rather than
+dropped, and the import summary lists which ones were ignored.
+
+Old `.xls` files are not supported — re-save as `.xlsx` or export CSV.
 
 Banks are keyed by `bankId` **and** `bankVersion`, so several versions can coexist and an old
 attempt keeps pointing at the version it was taken against.
+
+---
+
+## Editing a bank
+
+The editor is a back-office tool. It lives in bank management and nowhere else — most people never
+edit a bank, and it has no presence in the exam interface.
+
+Reach it from **Question Bank** on the start screen (or **Settings → Manage question banks**):
+
+| Action | What it does |
+| --- | --- |
+| **Edit** next to an installed bank | Opens that bank as a draft |
+| **Open a bank file to edit…** | Opens a `.json` from disk, keeping a write handle where the browser allows it |
+| **Create a new bank** | Starts an empty bank |
+| **Open in editor** after an import | Fixes up a freshly imported spreadsheet before installing it |
+
+### What you can change
+
+- Question id, source number, year, part, and the `cleaned` flag
+- The stem, either as plain text or as **content blocks** (paragraphs, lab tables, images)
+- Options: text, labels, order, add and delete
+- The answer key, by ticking options; single vs multiple answer, and how many to choose
+- Explanation, educational objective and the review note
+
+Renaming an option label carries the answer key with it, and deleting an option removes it from the
+key — so an edit never silently invalidates the key. **Relabel A–Z** renumbers every option in its
+current order and remaps the key to match; reordering alone deliberately does *not* renumber,
+because the source labels are what the printed exam and the answer key refer to.
+
+### Attaching images
+
+Switch the stem to **blocks**, then **Image**. The file is embedded in the bank as a data URL, so a
+bank stays a single portable file that can be emailed or committed — a relative path would break as
+soon as the file moved.
+
+Images wider or taller than 1400px are downscaled and re-encoded before embedding (JPEG, or PNG
+where transparency matters), and the result is only used if it is actually smaller than the
+original. SVG is passed through untouched. Each image shows its embedded size, so you can see a
+bank growing. Give every image **alt text**; it is what a screen reader announces.
+
+### The question list
+
+The rail shows one row per question with a health dot:
+
+| Dot | Meaning |
+| --- | --- |
+| Grey-green | No problems |
+| Amber | Warnings only — e.g. no answer key, or an option with no text |
+| Red | Errors — the bank will not install or re-import until they are fixed |
+
+The filter strip above it narrows the list to **Err**, **Warn**, **No key**, **Raw** (not marked
+cleaned) or **Noted** (carries a review note). For cleaning up an OCR pass, **Raw** and **Noted**
+are the two to live in.
+
+### Saving
+
+**Save** (or <kbd>Ctrl</kbd>+<kbd>S</kbd>) writes the bank as JSON.
+
+- In Chrome and Edge it writes back to the same file you opened, in place.
+- Firefox and Safari have no such API, so it downloads a copy instead and says so.
+
+A dot next to the bank title means unsaved changes; closing with unsaved work asks first, and so
+does reloading the tab. If the bank still has errors, saving asks for confirmation and warns that
+the file will not re-import until they are fixed — it still saves, because losing work is worse.
+
+**Install into the application** is separate from saving. It stores the bank in this browser so you
+can start an attempt on it, and it refuses banks that fail validation. Editing a file and
+installing it are deliberately two different actions.
+
+> Bump **bankVersion** (Bank → Bump) whenever you change content. Attempts are tied to a bank by id
+> *and* version, and the checksum guard will otherwise warn that a bank changed underneath them.
+
+---
+
+## Applying an answer key
+
+Answer keys usually arrive separately, as a flat list in question order:
+
+```
+# PRITE 2023, Part 1
+D
+A
+D
+...
+EFH
+```
+
+In the editor, press **Key**. Paste the list or load it from a file, then check the preview before
+applying.
+
+- One answer per line. Lines starting with `#` and blank lines are ignored, and a leading question
+  number (`12. D`) is stripped.
+- A multi-answer question can be written run together (`EFH`) or separated (`E, F, H`). A
+  run-together key is only split when the whole token matches no option label *and* every character
+  does — so a genuine multi-character label like `iii` is never chopped up.
+- Applying a key of several labels switches that question to multiple-select and sets how many to
+  choose.
+
+**The join is verified before anything is written.** A positional key that is off by one produces a
+bank that looks fine and is wrong everywhere, so the operation is all-or-nothing:
+
+| Situation | Result |
+| --- | --- |
+| Key length ≠ question count | Refused. Nothing applied. |
+| A key line names an option the question does not have | Refused, naming the question |
+| Joining by question number and the numbers have a gap | Refused, naming the missing number |
+| A question already has a *different* key | Left alone with a warning, unless **Replace them** is on |
+| A question already has the *same* key | Counted as already applied |
+
+Join by **Position** (line N ↔ question N) or by **Question number** (line N ↔ the question whose
+`sourceQuestionNumber` is N). The second survives a reordered bank, so prefer it when your source
+numbers are trustworthy.
+
+A worked example lives in [`answer-keys/2023-part1.txt`](answer-keys/2023-part1.txt) — 150 answers,
+147 single and 3 multi-answer.
 
 ---
 
@@ -586,6 +727,13 @@ A progress file looks like:
 Shortcuts do not fire while focus is in a text field, while a modifier is held, or while a dialog
 is open, and can be turned off entirely in Settings.
 
+In the **editor**, where almost everything is a text field, the shortcuts are modified instead:
+
+| Key | Action |
+| --- | --- |
+| <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>S</kbd> | Save |
+| <kbd>Alt</kbd>+<kbd>←</kbd> / <kbd>→</kbd> | Previous / next question |
+
 ---
 
 ## Testing
@@ -611,6 +759,13 @@ Covers the behaviour most likely to break:
   the options and the rail, mark persistence across navigation, notes, keyboard shortcuts,
   review filters and reopening
 - rail: virtualization window with 2,000 questions, every status indicator, exam-mode masking
+- spreadsheet reading: quoted commas, escaped quotes, newlines inside a field, CRLF, BOM,
+  delimiter detection, shared vs inline strings, omitted cells keeping columns aligned, sheet
+  selection, column-name aliasing
+- answer keys: run-together vs separated multi-answers, multi-character labels left intact,
+  length-mismatch refusal, unknown-option refusal, gap detection, overwrite behaviour
+- authoring: every edit operation, label renames carrying the key, validation levels, and the
+  editor UI — dirty tracking, rail filters, install refusal, discard confirmation, key dialog
 
 ---
 
@@ -654,6 +809,24 @@ attempt stays responsive. The scroll surface still reserves full height, so the 
 **Narrow viewports get a two-row toolbar**, not a hidden menu: identity and navigation on the first
 row, a horizontally scrollable tool strip on the second, and the status rail becomes a drawer.
 Desktop density was not softened to achieve this.
+
+**The editor is a separate mode, not a mode switch.** Banks stay immutable as far as attempts are
+concerned: the editor works on a detached draft, and installing the result is an explicit second
+step. That is why "Save" (to a file) and "Install" (into the app) are two different buttons rather
+than one.
+
+**Images are embedded, not linked.** A bank is meant to be one file you can send someone. A
+relative image path would break the moment it moved, so images become data URLs — with downscaling
+on the way in, because otherwise a handful of phone photos makes a bank unusable.
+
+**The xlsx reader is hand-rolled.** It unzips with `fflate` and walks the XML with the platform
+`DOMParser`, reading cell values only. Spreadsheet libraries are large and this parses files the
+user picked off disk, so keeping third-party code out of that path is worth the narrower feature
+set. Anything it cannot handle has an escape hatch: export as CSV.
+
+**Answer-key joins are all-or-nothing.** A partially applied positional key is worse than none,
+because the wrong answers look exactly like the right ones. Everything is validated before the
+first write.
 
 **The bundled fixtures are fixtures.** `src/sample-data/sample-bank.json` contains synthetic
 questions written to exercise the renderer (A–D, A–E, A–H, select-two, select-three, a lab table,

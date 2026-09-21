@@ -454,6 +454,10 @@
 .stem-figure img {
   display: block;
   max-width: 100%;
+  /* Cap the height so a portrait figure cannot push the options off-screen.
+     With height:auto the aspect ratio is preserved against both limits. */
+  max-height: 560px;
+  width: auto;
   height: auto;
   border: 1px solid var(--border-soft);
 }
