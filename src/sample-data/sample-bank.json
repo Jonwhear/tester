@@ -1,0 +1,498 @@
+{
+  "schemaVersion": 1,
+  "bankId": "dev-fixture",
+  "bankVersion": "2024.1",
+  "title": "Development Fixture Bank",
+  "description": "Synthetic questions used to exercise the renderer during development. These are UI fixtures, not a medical reference, and no answer key here should be treated as clinically authoritative. Replace this file with a generated bank before real use.",
+  "createdAt": "2024-01-01T00:00:00.000Z",
+  "source": {
+    "exam": "Development fixtures",
+    "years": [
+      2024
+    ]
+  },
+  "questions": [
+    {
+      "id": "2024-P1-Q001",
+      "sourceQuestionNumber": 1,
+      "year": 2024,
+      "part": 1,
+      "questionType": "single",
+      "stem": "",
+      "contentBlocks": [
+        {
+          "type": "paragraph",
+          "text": "A 4-year-old girl with a known chronic haemolytic anaemia is brought to the emergency department with fatigue and loss of appetite. Her parents first noticed her fatigue 3 days ago when she asked to go to sleep earlier than her bedtime. Over the past 2 days the patient has been drinking well but eating much less than normal. Her father states, \"She's been so tired that she wouldn't even get out of bed this morning.\" She had an episode of acute chest syndrome 2 years prior that required an exchange transfusion. The patient takes folic acid and penicillin. Immunizations are up to date, including the annual influenza vaccine. Temperature is 36.7 C (98 F), blood pressure is 110/65 mm Hg, pulse is 120/min, and respirations are 25/min. Oxygen saturation is 95% on room air. Physical examination shows a pale and tired-appearing girl. Conjunctival pallor is present. Respiratory, abdominal, and neurologic examinations are within normal limits. Laboratory results are as follows:"
+        },
+        {
+          "type": "table",
+          "columns": [
+            "",
+            ""
+          ],
+          "rows": [
+            [
+              "Hemoglobin",
+              "5.0 g/dL"
+            ],
+            [
+              "Mean corpuscular volume",
+              "85 fL"
+            ],
+            [
+              "Reticulocytes",
+              "0.1%"
+            ],
+            [
+              "Platelets",
+              "200,000/mm³"
+            ],
+            [
+              "Leukocytes",
+              "7,500/mm³"
+            ],
+            [
+              "   Neutrophils",
+              "56%"
+            ],
+            [
+              "   Eosinophils",
+              "1%"
+            ],
+            [
+              "   Lymphocytes",
+              "33%"
+            ],
+            [
+              "   Monocytes",
+              "10%"
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Which of the following is the most likely diagnosis of this patient?"
+        }
+      ],
+      "options": [
+        {
+          "label": "A",
+          "text": "Acute chest syndrome"
+        },
+        {
+          "label": "B",
+          "text": "Aplastic crisis"
+        },
+        {
+          "label": "C",
+          "text": "Hyperhemolytic crisis"
+        },
+        {
+          "label": "D",
+          "text": "Splenic sequestration"
+        },
+        {
+          "label": "E",
+          "text": "Stroke"
+        }
+      ],
+      "correctAnswer": [
+        "B"
+      ],
+      "explanation": "FIXTURE EXPLANATION. The distinguishing feature in this vignette is the reticulocyte count of 0.1%: a marrow that has stopped producing red cells despite profound anaemia. Haemolytic and sequestration processes would be expected to drive the reticulocyte count up rather than down.",
+      "educationalObjective": "FIXTURE OBJECTIVE. Use the reticulocyte response to separate production failure from increased destruction or pooling.",
+      "references": [
+        "Development fixture — no real reference"
+      ],
+      "metadata": {
+        "subject": "Hematology",
+        "system": "Hematologic & Lymphatic",
+        "topic": "Anemia"
+      },
+      "cleaned": true
+    },
+    {
+      "id": "2024-P1-Q002",
+      "sourceQuestionNumber": 2,
+      "year": 2024,
+      "part": 1,
+      "questionType": "single",
+      "stem": "Which of the following vessels supplies the sinoatrial node in the majority of individuals?",
+      "options": [
+        {
+          "label": "A",
+          "text": "Left anterior descending artery"
+        },
+        {
+          "label": "B",
+          "text": "Left circumflex artery"
+        },
+        {
+          "label": "C",
+          "text": "Right coronary artery"
+        },
+        {
+          "label": "D",
+          "text": "Posterior descending artery"
+        }
+      ],
+      "correctAnswer": [
+        "C"
+      ],
+      "explanation": "FIXTURE EXPLANATION. Short-stem fixture demonstrating a four-option question with an explanation present.",
+      "metadata": {
+        "subject": "Anatomy",
+        "system": "Cardiovascular"
+      },
+      "cleaned": true
+    },
+    {
+      "id": "2024-P1-Q003",
+      "sourceQuestionNumber": 3,
+      "year": 2024,
+      "part": 1,
+      "questionType": "single",
+      "stem": "A 62-year-old man is evaluated for a 6-month history of progressive exertional dyspnoea. Examination reveals a mid-systolic murmur at the right upper sternal border radiating to the carotids, with a delayed and diminished carotid upstroke.\n\nWhich of the following findings would be most consistent with the suspected diagnosis?",
+      "options": [
+        {
+          "label": "A",
+          "text": "Concentric left ventricular hypertrophy"
+        },
+        {
+          "label": "B",
+          "text": "Dilated left atrium with normal ventricular wall thickness"
+        },
+        {
+          "label": "C",
+          "text": "Eccentric right ventricular hypertrophy"
+        },
+        {
+          "label": "D",
+          "text": "Isolated right atrial enlargement"
+        },
+        {
+          "label": "E",
+          "text": "Normal chamber dimensions"
+        }
+      ],
+      "correctAnswer": [
+        "A"
+      ],
+      "metadata": {
+        "subject": "Cardiology",
+        "system": "Cardiovascular"
+      },
+      "cleaned": true
+    },
+    {
+      "id": "2024-P1-Q004",
+      "sourceQuestionNumber": 4,
+      "year": 2024,
+      "part": 1,
+      "questionType": "multiple",
+      "selectCount": 3,
+      "stem": "A 58-year-old woman is admitted with community-acquired pneumonia. The admitting team is assembling the initial order set.\n\nWhich of the following are appropriate components of the initial assessment? (Select three.)",
+      "options": [
+        {
+          "label": "A",
+          "text": "Chest radiography"
+        },
+        {
+          "label": "B",
+          "text": "Assessment of oxygen saturation"
+        },
+        {
+          "label": "C",
+          "text": "Routine bronchoscopy"
+        },
+        {
+          "label": "D",
+          "text": "Severity scoring to guide site of care"
+        },
+        {
+          "label": "E",
+          "text": "Routine serum procalcitonin before any antibiotic decision"
+        },
+        {
+          "label": "F",
+          "text": "Routine chest CT angiography"
+        },
+        {
+          "label": "G",
+          "text": "Routine pulmonary function testing"
+        },
+        {
+          "label": "H",
+          "text": "Routine lung biopsy"
+        }
+      ],
+      "correctAnswer": [
+        "A",
+        "B",
+        "D"
+      ],
+      "explanation": "FIXTURE EXPLANATION. Multiple-select fixture with eight options. Grading requires the selected set to exactly equal {A, B, D}; a partial match is not credited.",
+      "educationalObjective": "FIXTURE OBJECTIVE. Demonstrates select-three grading across an A–H option list.",
+      "metadata": {
+        "subject": "Internal Medicine",
+        "system": "Respiratory"
+      },
+      "cleaned": true
+    },
+    {
+      "id": "2024-P1-Q005",
+      "sourceQuestionNumber": 5,
+      "year": 2024,
+      "part": 1,
+      "questionType": "single",
+      "stem": "A 27-year-old woman presents with a 3-week history of fatigue and intermittent low-grade fever.\n\nWhich of the following is the most appropriate next step in management?",
+      "options": [
+        {
+          "label": "A",
+          "text": "Complete blood count with differential"
+        },
+        {
+          "label": "B",
+          "text": "Empiric broad-spectrum antibiotics"
+        },
+        {
+          "label": "C",
+          "text": "Bone marrow biopsy"
+        },
+        {
+          "label": "D",
+          "text": "Reassurance and review in 6 months"
+        },
+        {
+          "label": "E",
+          "text": "Immediate splenectomy"
+        }
+      ],
+      "reviewNote": "Answer key not transcribed from the source yet — flagged for reviewer.",
+      "metadata": {
+        "subject": "Internal Medicine"
+      },
+      "cleaned": false
+    },
+    {
+      "id": "2024-P1-Q006",
+      "sourceQuestionNumber": 6,
+      "year": 2024,
+      "part": 1,
+      "questionType": "single",
+      "stem": "",
+      "contentBlocks": [
+        {
+          "type": "paragraph",
+          "text": "A 70-year-old man undergoes continuous monitoring on the ward. The following tracing is recorded."
+        },
+        {
+          "type": "image",
+          "src": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22420%22%20height%3D%22180%22%20viewBox%3D%220%200%20420%20180%22%3E%3Crect%20width%3D%22420%22%20height%3D%22180%22%20fill%3D%22%230d1011%22%2F%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%2365777a%22%20stroke-width%3D%221%22%3E%3Cpath%20d%3D%22M40%20140%20H392%22%2F%3E%3Cpath%20d%3D%22M40%2020%20V140%22%2F%3E%3C%2Fg%3E%3Cpolyline%20fill%3D%22none%22%20stroke%3D%22%2363d8ec%22%20stroke-width%3D%222%22%20points%3D%2240%2C132%2080%2C128%20110%2C60%20125%2C118%20160%2C124%20200%2C120%20240%2C116%20270%2C52%20285%2C112%20330%2C118%20392%2C116%22%2F%3E%3Ctext%20x%3D%22210%22%20y%3D%22168%22%20fill%3D%22%239ca8aa%22%20font-family%3D%22sans-serif%22%20font-size%3D%2212%22%20text-anchor%3D%22middle%22%3EFixture%20tracing%20%26%238212%3B%20synthetic%20data%2C%20not%20a%20clinical%20recording%3C%2Ftext%3E%3C%2Fsvg%3E",
+          "alt": "Synthetic waveform tracing used as a development fixture",
+          "caption": "Figure 1. Fixture tracing (synthetic)."
+        },
+        {
+          "type": "paragraph",
+          "text": "Which of the following best describes the tracing shown above?"
+        }
+      ],
+      "options": [
+        {
+          "label": "A",
+          "text": "Regular baseline with two higher-amplitude deflections"
+        },
+        {
+          "label": "B",
+          "text": "Complete absence of any deflection"
+        },
+        {
+          "label": "C",
+          "text": "Uniform sawtooth pattern throughout"
+        },
+        {
+          "label": "D",
+          "text": "Continuous high-frequency oscillation"
+        }
+      ],
+      "correctAnswer": [
+        "A"
+      ],
+      "explanation": "FIXTURE EXPLANATION. Exists to prove that an inline image block renders, scales to the content width and keeps its caption.",
+      "cleaned": true
+    },
+    {
+      "id": "2024-P1-Q007",
+      "sourceQuestionNumber": 7,
+      "year": 2024,
+      "part": 1,
+      "questionType": "multiple",
+      "selectCount": 2,
+      "stem": "Which two of the following are paired correctly as vitamin and its principal deficiency syndrome? (Select two.)",
+      "options": [
+        {
+          "label": "A",
+          "text": "Vitamin C — scurvy"
+        },
+        {
+          "label": "B",
+          "text": "Vitamin D — scurvy"
+        },
+        {
+          "label": "C",
+          "text": "Thiamine — beriberi"
+        },
+        {
+          "label": "D",
+          "text": "Vitamin K — pellagra"
+        },
+        {
+          "label": "E",
+          "text": "Niacin — rickets"
+        },
+        {
+          "label": "F",
+          "text": "Folate — beriberi"
+        }
+      ],
+      "correctAnswer": [
+        "A",
+        "C"
+      ],
+      "explanation": "FIXTURE EXPLANATION. Select-two fixture across six options.",
+      "cleaned": true
+    },
+    {
+      "id": "2024-P1-Q008",
+      "sourceQuestionNumber": 8,
+      "year": 2024,
+      "part": 1,
+      "questionType": "single",
+      "stem": "A 54-year-old man with a 30-pack-year smoking history presents with 4 months of progressive dyspnoea on exertion and a chronic productive cough. He reports three exacerbations in the past year, each treated with oral corticosteroids. He has no orthopnoea and no lower-limb oedema. Temperature is 36.9 C (98.4 F), blood pressure is 128/78 mm Hg, pulse is 88/min, and respirations are 20/min. Oxygen saturation is 93% on room air. Examination shows a barrel-shaped chest, diminished breath sounds bilaterally, and a prolonged expiratory phase. Spirometry after bronchodilator shows an FEV1/FVC ratio of 0.58 with an FEV1 of 55% predicted.\n\nWhich of the following is the most appropriate next step in long-term management?",
+      "options": [
+        {
+          "label": "A",
+          "text": "Long-acting bronchodilator therapy"
+        },
+        {
+          "label": "B",
+          "text": "Continuous home oxygen therapy"
+        },
+        {
+          "label": "C",
+          "text": "Long-term daily oral corticosteroids"
+        },
+        {
+          "label": "D",
+          "text": "Lung volume reduction surgery"
+        },
+        {
+          "label": "E",
+          "text": "Prophylactic daily antibiotics"
+        }
+      ],
+      "correctAnswer": [
+        "A"
+      ],
+      "suggestedHighlights": [
+        {
+          "text": "30-pack-year smoking history",
+          "note": "Principal risk factor stated in the stem."
+        },
+        {
+          "text": "FEV1/FVC ratio of 0.58",
+          "note": "Fixed obstruction after bronchodilator."
+        },
+        {
+          "text": "three exacerbations in the past year"
+        }
+      ],
+      "explanation": "FIXTURE EXPLANATION. Long-stem fixture that also carries suggestedHighlights supplied by the upstream pipeline.",
+      "metadata": {
+        "subject": "Internal Medicine",
+        "system": "Respiratory",
+        "topic": "COPD"
+      },
+      "cleaned": true
+    },
+    {
+      "id": "2024-P1-Q009",
+      "sourceQuestionNumber": 9,
+      "year": 2024,
+      "part": 1,
+      "questionType": "single",
+      "stem": "Which of the following cranial nerves carries parasympathetic fibres to the parotid gland?",
+      "options": [
+        {
+          "label": "A",
+          "text": "Olfactory (I)"
+        },
+        {
+          "label": "B",
+          "text": "Oculomotor (III)"
+        },
+        {
+          "label": "C",
+          "text": "Trigeminal (V)"
+        },
+        {
+          "label": "D",
+          "text": "Facial (VII)"
+        },
+        {
+          "label": "E",
+          "text": "Vestibulocochlear (VIII)"
+        },
+        {
+          "label": "F",
+          "text": "Glossopharyngeal (IX)"
+        },
+        {
+          "label": "G",
+          "text": "Vagus (X)"
+        },
+        {
+          "label": "H",
+          "text": "Hypoglossal (XII)"
+        }
+      ],
+      "correctAnswer": [
+        "F"
+      ],
+      "explanation": "FIXTURE EXPLANATION. Eight-option single-select fixture proving the renderer never assumes five choices.",
+      "metadata": {
+        "subject": "Anatomy",
+        "system": "Nervous"
+      },
+      "cleaned": true
+    },
+    {
+      "id": "2024-P1-Q010",
+      "sourceQuestionNumber": 10,
+      "year": 2024,
+      "part": 1,
+      "questionType": "single",
+      "stem": "[SOURCE PAGE MISSING — stem not recovered from the scan]\n\nWhich of the following is the most likely diagnosis?",
+      "options": [
+        {
+          "label": "A",
+          "text": "[OPTION TEXT MISSING — not recovered from the scan]"
+        },
+        {
+          "label": "B",
+          "text": "Bacterial endocarditis"
+        },
+        {
+          "label": "C",
+          "text": "Rheumatic fever"
+        },
+        {
+          "label": "D",
+          "text": "[OPTION TEXT MISSING — not recovered from the scan]"
+        }
+      ],
+      "reviewNote": "Page 12 of the source scan is illegible. Placeholders inserted deliberately; do not repair in the application.",
+      "cleaned": false
+    }
+  ]
+}

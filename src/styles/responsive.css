@@ -1,0 +1,165 @@
+/*
+ * Desktop is the primary target: the rules below only start changing things
+ * once the viewport can no longer hold the reference layout. The desktop
+ * density above is never softened to make narrow screens easier.
+ */
+
+@media (max-width: 1000px) {
+  :root {
+    --content-pad-x: 20px;
+  }
+  .toolitem {
+    min-width: 44px;
+    padding: 4px 4px 2px;
+  }
+  .toolitem__label {
+    display: none;
+  }
+  .stem-table {
+    margin-left: 120px;
+  }
+}
+
+@media (max-width: 760px) {
+
+  .exam-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Rail becomes an overlay drawer, toggled from the toolbar. */
+  .rail {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: var(--rail-width);
+    z-index: 30;
+    border-right: 1px solid var(--border);
+    transform: translateX(-100%);
+    transition: transform 120ms ease-out;
+  }
+  .rail--open {
+    transform: translateX(0);
+  }
+
+  .exam-main {
+    border-left: none;
+  }
+
+  .rail-toggle {
+    display: grid;
+  }
+
+  .rail-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 29;
+    background: rgba(0, 0, 0, 0.55);
+    border: none;
+  }
+
+  /*
+   * Everything from the desktop toolbar has to stay reachable, and at phone
+   * width the tools no longer fit beside the navigation. The toolbar becomes
+   * two rows — identity and navigation above, a scrollable tool strip below —
+   * rather than hiding controls behind a menu.
+   */
+  .exam-main {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .toolbar {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    align-items: center;
+    gap: 3px 6px;
+    padding: 4px 6px 2px;
+  }
+  .toolbar__left {
+    grid-column: 1;
+    grid-row: 1;
+    gap: 6px;
+  }
+  .toolbar__center {
+    grid-column: 2;
+    grid-row: 1;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+  .toolbar__right {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: flex-start;
+    gap: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+  .toolbar__right::-webkit-scrollbar {
+    display: none;
+  }
+  .toolitem {
+    min-width: 40px;
+    padding: 2px 5px 1px;
+    flex: none;
+  }
+  .item-box {
+    font-size: 11px;
+    padding: 2px 5px;
+    border-width: 1px;
+  }
+  .navbtn__label {
+    display: none;
+  }
+  .navbtn__icon {
+    width: 26px;
+    height: 26px;
+  }
+  .toolbar__counter {
+    font-size: 13px;
+    min-width: 48px;
+  }
+
+  .question-actions {
+    flex-wrap: wrap;
+    gap: 10px 20px;
+    margin-bottom: 18px;
+  }
+
+  .stem-table {
+    margin-left: 24px;
+  }
+
+  .options {
+    min-width: 0;
+    width: 100%;
+  }
+  .option {
+    padding-left: 12px;
+  }
+
+  .screen__inner {
+    padding: 18px 14px 50px;
+  }
+  .overlay {
+    padding: 16px 10px;
+  }
+  .dialog {
+    max-height: calc(100vh - 32px);
+  }
+}
+
+@media (max-width: 520px) {
+  .score-strip__cell {
+    min-width: 50%;
+    border-right: none;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .stem-table {
+    margin-left: 0;
+  }
+  .table th:nth-child(4),
+  .table td:nth-child(4) {
+    display: none;
+  }
+}

@@ -1,0 +1,83 @@
+/*
+ * Design tokens.
+ *
+ * Values are read off the reference screenshot: near-black canvas, a charcoal
+ * status rail with lighter alternating rows, thin cyan rules and cyan state
+ * accents. Everything is rectilinear — radii stay at 0-2px by design.
+ */
+:root {
+  /* Surfaces */
+  --bg-app: #000000;
+  --bg-content: #030505;
+  --bg-rail: #0a0c0d;
+  --bg-rail-row: #101313;
+  --bg-rail-row-alt: #343737;
+  --bg-toolbar: #000000;
+  --bg-panel: #111415;
+  --bg-panel-raised: #171b1c;
+  --bg-input: #0a0d0e;
+  --bg-hover: #1b2021;
+
+  /* Text */
+  --text: #e5e8e8;
+  --text-strong: #ffffff;
+  --text-muted: #9ca8aa;
+  --text-faint: #5f6b6d;
+  --text-on-cyan: #071012;
+
+  /* Lines */
+  --border: #65777a;
+  --border-soft: #2a3132;
+  --border-strong: #8b9ea1;
+  --rule-cyan: #3e8ba0;
+
+  /* Accent */
+  --cyan: #63d8ec;
+  --cyan-bright: #72dced;
+  --cyan-dim: #3c93a5;
+  --cyan-wash: #0e2a31;
+
+  /* Grading — restrained, never fluorescent */
+  --ok: #4f9d69;
+  --ok-line: #3f7f55;
+  --ok-wash: #11241a;
+  --bad: #c0574f;
+  --bad-line: #8f4640;
+  --bad-wash: #2a1412;
+  --warn: #c4a052;
+
+  /* Typography */
+  --font-ui: "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial,
+    "Noto Sans", sans-serif;
+  --font-mono: "Cascadia Mono", Consolas, "SF Mono", "Liberation Mono", monospace;
+
+  --fs-body: 15px;
+  --fs-small: 12.5px;
+  --fs-tiny: 10.5px;
+  --lh-body: 1.5;
+
+  /* Metrics */
+  --rail-width: 92px;
+  --rail-row-height: 25px;
+  --toolbar-height: 57px;
+  --content-pad-x: 33px;
+  --content-pad-top: 20px;
+  --content-measure: 940px;
+
+  --focus-ring: 0 0 0 2px var(--cyan);
+}
+
+/* Settings -> Font size */
+:root[data-font-size='small'] {
+  --fs-body: 13.5px;
+  --fs-small: 11.5px;
+}
+:root[data-font-size='large'] {
+  --fs-body: 17px;
+  --fs-small: 13.5px;
+}
+
+/* Settings -> Content width */
+:root[data-content-width='wide'] {
+  --content-measure: 1240px;
+}

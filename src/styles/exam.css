@@ -1,0 +1,697 @@
+/* ==================================================================
+   Examination shell
+   ================================================================== */
+
+.exam-shell {
+  display: grid;
+  grid-template-columns: var(--rail-width) minmax(0, 1fr);
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--bg-app);
+}
+
+.exam-main {
+  display: grid;
+  grid-template-rows: var(--toolbar-height) minmax(0, 1fr);
+  min-width: 0;
+  border-left: 1px solid var(--border);
+}
+
+/* ==================================================================
+   Question status rail
+   ================================================================== */
+
+.rail {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  background: var(--bg-rail);
+  min-height: 0;
+}
+
+.rail__header {
+  padding: 3px 4px 4px;
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--text-strong);
+  background: var(--bg-rail);
+}
+
+.rail__list {
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  position: relative;
+}
+
+/* Virtualization spacer: only the visible window of rows is mounted, so a
+   1,000+ question bank scrolls without mounting 1,000 DOM nodes. */
+.rail__spacer {
+  position: relative;
+  width: 100%;
+}
+
+.rail__window {
+  position: absolute;
+  left: 0;
+  right: 0;
+}
+
+.rail__row {
+  display: grid;
+  grid-template-columns: 17px minmax(0, 1fr);
+  align-items: center;
+  width: 100%;
+  height: var(--rail-row-height);
+  padding: 0 4px 0 3px;
+  text-align: left;
+  background: var(--bg-rail-row);
+  color: var(--text);
+  font-size: 13.5px;
+  line-height: 1;
+  cursor: pointer;
+  border: none;
+  border-bottom: 1px solid #000;
+}
+
+.rail__row--alt {
+  background: var(--bg-rail-row-alt);
+}
+
+.rail__row:hover {
+  background: #232828;
+}
+.rail__row--alt:hover {
+  background: #434747;
+}
+
+.rail__row--current,
+.rail__row--current.rail__row--alt,
+.rail__row--current:hover {
+  background: var(--cyan-bright);
+  color: var(--text-on-cyan);
+  font-weight: 600;
+}
+
+.rail__row:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: -2px;
+}
+
+/* Status dot: correctness/answered indicator, independent of "current". */
+.rail__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  justify-self: center;
+  background: transparent;
+  border: 1px solid var(--text-faint);
+}
+.rail__dot--seen {
+  background: #6d7a7c;
+  border-color: #6d7a7c;
+}
+.rail__dot--answered {
+  background: var(--cyan);
+  border-color: var(--cyan);
+}
+.rail__dot--correct {
+  background: var(--ok);
+  border-color: var(--ok);
+}
+.rail__dot--incorrect {
+  background: var(--bad);
+  border-color: var(--bad);
+}
+.rail__dot--ungradable {
+  background: var(--warn);
+  border-color: var(--warn);
+}
+/* On the cyan current row a plain cyan dot would vanish — outline it. */
+.rail__row--current .rail__dot--answered {
+  background: var(--text-on-cyan);
+  border-color: var(--text-on-cyan);
+}
+.rail__row--current .rail__dot {
+  box-shadow: 0 0 0 1px rgba(7, 16, 18, 0.55);
+}
+
+.rail__number {
+  justify-self: center;
+  padding: 0 3px;
+  min-width: 22px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Marked questions get a boxed number, as in the reference application. */
+.rail__number--marked {
+  border: 1px solid var(--text-strong);
+  padding: 0 4px;
+}
+.rail__row--current .rail__number--marked {
+  border-color: var(--text-on-cyan);
+}
+
+/* Not yet opened: dimmed number. */
+.rail__number--unseen {
+  color: var(--text-faint);
+}
+.rail__row--current .rail__number--unseen {
+  color: rgba(7, 16, 18, 0.55);
+}
+
+.rail__empty {
+  padding: 10px 6px;
+  font-size: 11px;
+  color: var(--text-faint);
+  text-align: center;
+}
+
+/* ==================================================================
+   Top toolbar
+   ================================================================== */
+
+.toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px 0 7px;
+  background: var(--bg-toolbar);
+  border-bottom: 1px solid var(--rule-cyan);
+  min-width: 0;
+}
+
+.toolbar__left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* "Item: 6 of 40 / Question Id: ..." block */
+.item-box {
+  border: 2px solid var(--cyan);
+  padding: 3px 7px;
+  line-height: 1.32;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-strong);
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.item-box__id {
+  font-weight: 700;
+}
+
+.toolbar__center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+.navbtn {
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  padding: 2px 4px 1px;
+  color: var(--text);
+  font-size: var(--fs-tiny);
+  line-height: 1.1;
+}
+.navbtn__icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--cyan);
+  color: var(--text-on-cyan);
+}
+.navbtn:hover:not(:disabled) .navbtn__icon {
+  background: var(--cyan-bright);
+}
+.navbtn:disabled {
+  cursor: default;
+  color: var(--text-faint);
+}
+.navbtn:disabled .navbtn__icon {
+  background: #2b3435;
+  color: #59686a;
+}
+
+.toolbar__counter {
+  font-size: 15px;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+  min-width: 62px;
+  text-align: center;
+}
+
+.toolbar__right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  min-width: 0;
+}
+
+.toolitem {
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  padding: 4px 6px 2px;
+  min-width: 52px;
+  color: var(--text);
+  font-size: var(--fs-tiny);
+  line-height: 1.1;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.toolitem svg {
+  color: var(--cyan);
+}
+.toolitem:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-soft);
+}
+.toolitem--active {
+  background: #20282a;
+  border-color: var(--cyan-dim);
+}
+.toolitem--disabled {
+  color: var(--text-faint);
+  cursor: default;
+}
+.toolitem--disabled svg {
+  color: #2f4245;
+}
+.toolitem--disabled:hover {
+  background: none;
+  border-color: transparent;
+}
+
+.rail-toggle {
+  display: none;
+}
+
+/* Click-away target behind the rail drawer. Narrow viewports only. */
+.rail-scrim {
+  display: none;
+}
+
+/* ==================================================================
+   Question content
+   ================================================================== */
+
+.question-pane {
+  overflow-y: auto;
+  min-height: 0;
+  background: var(--bg-content);
+  padding: var(--content-pad-top) 24px 80px var(--content-pad-x);
+}
+
+.question-pane__inner {
+  max-width: var(--content-measure);
+}
+
+.question-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 26px;
+  max-width: var(--content-measure);
+}
+
+/* Compact square checkbox control used by Mark Question / Suggested Highlights */
+.checkline {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text);
+  font-size: var(--fs-body);
+  user-select: none;
+  cursor: pointer;
+}
+.checkline input {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex: none;
+}
+.checkline input:checked {
+  border-color: var(--cyan);
+  background: var(--cyan);
+}
+.checkline input:checked::after {
+  content: '';
+  width: 8px;
+  height: 4px;
+  border-left: 2px solid var(--text-on-cyan);
+  border-bottom: 2px solid var(--text-on-cyan);
+  transform: translateY(-1px) rotate(-45deg);
+}
+.checkline input:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 1px;
+}
+.checkline--marked .checkline__flag {
+  color: var(--cyan);
+}
+.checkline__flag {
+  color: var(--text);
+  display: inline-flex;
+}
+
+.stem {
+  color: var(--text);
+  font-size: var(--fs-body);
+  line-height: 1.5;
+}
+.stem p {
+  margin: 0 0 14px;
+  white-space: pre-wrap;
+}
+.stem p:last-child {
+  margin-bottom: 0;
+}
+.stem__emphasis {
+  font-weight: 600;
+}
+
+.stem mark {
+  background: rgba(99, 216, 236, 0.16);
+  color: var(--text);
+  border-bottom: 1px solid var(--cyan-dim);
+  padding: 0 1px;
+}
+
+/* Lab tables: no coloured header, minimal rules, indented from the stem. */
+.stem-table {
+  margin: 18px 0 20px 300px;
+  border-collapse: collapse;
+  font-size: var(--fs-body);
+}
+.stem-table caption {
+  text-align: left;
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+  padding-bottom: 6px;
+}
+.stem-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+  padding: 0 34px 6px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+.stem-table th:last-child,
+.stem-table td:last-child {
+  padding-right: 0;
+}
+.stem-table td {
+  padding: 6px 34px 6px 0;
+  line-height: 1.35;
+  vertical-align: top;
+  white-space: pre-wrap;
+}
+.stem-table tbody tr:first-child td,
+.stem-table tbody tr:first-child th {
+  padding-top: 10px;
+}
+
+/* Label column of a headerless lab table: plain body text, not a heading. */
+.stem-table th.stem-table__rowhead {
+  text-align: left;
+  font-weight: 400;
+  color: var(--text);
+  font-size: var(--fs-body);
+  line-height: 1.35;
+  padding: 6px 34px 6px 0;
+  border-bottom: none;
+  white-space: pre-wrap;
+  vertical-align: top;
+}
+
+.stem-figure {
+  margin: 16px 0 20px;
+}
+.stem-figure img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--border-soft);
+}
+.stem-figure figcaption {
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+}
+
+.review-note {
+  margin: 14px 0 0;
+  padding-block: 4px;
+  border-left: 2px solid var(--warn);
+  padding: 4px 0 4px 10px;
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+}
+.review-note__label {
+  color: var(--warn);
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+/* ==================================================================
+   Answer options
+   ================================================================== */
+
+.options {
+  margin-top: 22px;
+  width: fit-content;
+  min-width: 300px;
+  max-width: min(100%, var(--content-measure));
+  border: 1px solid var(--border-strong);
+  border-bottom: 2px solid var(--cyan);
+  background: var(--bg-content);
+}
+
+.options__instruction {
+  margin: 0;
+  padding: 7px 12px 6px;
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+}
+
+.option {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px 7px 38px;
+  text-align: left;
+  color: var(--text);
+  font-size: var(--fs-body);
+  line-height: 1.35;
+  background: transparent;
+  border: 1px solid transparent;
+}
+.option + .option {
+  border-top-color: transparent;
+}
+.option:hover:not(.option--locked) {
+  background: #0e1314;
+}
+.option:focus-within {
+  border-color: var(--cyan-dim);
+}
+
+.option__control {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 1px 0 0;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex: none;
+}
+.option__control[type='radio'] {
+  border-radius: 50%;
+}
+.option__control:checked::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  background: var(--cyan);
+}
+.option__control[type='radio']:checked::after {
+  border-radius: 50%;
+}
+.option__control:disabled {
+  cursor: default;
+}
+.option__control:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.option__label {
+  font-weight: 400;
+  min-width: 16px;
+}
+
+.option__text {
+  white-space: pre-wrap;
+}
+
+.option--crossed .option__label,
+.option--crossed .option__text {
+  text-decoration: line-through;
+  color: var(--text-faint);
+}
+
+/* Selected, not yet graded (exam mode, or tutor before Check Answer). */
+.option--selected {
+  background: var(--cyan-wash);
+  border-color: var(--cyan-dim);
+}
+
+.option--correct {
+  background: var(--ok-wash);
+  border-color: var(--ok-line);
+}
+.option--correct .option__control:checked::after {
+  background: var(--ok);
+}
+.option--incorrect {
+  background: var(--bad-wash);
+  border-color: var(--bad-line);
+}
+.option--incorrect .option__control:checked::after {
+  background: var(--bad);
+}
+
+.option__verdict {
+  align-self: center;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 20px;
+  font-size: 14px;
+  line-height: 1;
+}
+.option--correct .option__verdict {
+  color: var(--ok);
+}
+.option--incorrect .option__verdict {
+  color: var(--bad);
+}
+
+/* Per-option cross-out ("ab" struck through) elimination aid. */
+.option__strike {
+  align-self: center;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 20px;
+  color: var(--text-muted);
+  border: 1px solid transparent;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  text-decoration: line-through;
+  opacity: 0.75;
+}
+.option__strike:hover {
+  color: var(--text);
+  border-color: var(--border-soft);
+  opacity: 1;
+}
+.option--crossed .option__strike {
+  color: var(--cyan);
+  opacity: 1;
+  text-decoration: none;
+}
+
+.answer-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 13px;
+  max-width: var(--content-measure);
+}
+
+.answer-note {
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+}
+.answer-note--warn {
+  color: var(--warn);
+}
+
+/* Tutor-mode feedback block under the options. */
+.feedback {
+  margin-top: 18px;
+  max-width: var(--content-measure);
+  border-top: 1px solid var(--border-soft);
+  padding-top: 13px;
+}
+.feedback__verdict {
+  font-size: var(--fs-body);
+  font-weight: 600;
+  margin: 0 0 10px;
+}
+.feedback__verdict--correct {
+  color: var(--ok);
+}
+.feedback__verdict--incorrect {
+  color: var(--bad);
+}
+.feedback__verdict--ungradable {
+  color: var(--warn);
+}
+.feedback__section {
+  margin-bottom: 14px;
+}
+.feedback__section:last-child {
+  margin-bottom: 0;
+}
+.feedback__heading {
+  font-size: var(--fs-small);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+}
+.feedback__body {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+.feedback__list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+}
