@@ -81,6 +81,7 @@ export function BankManagerScreen({ onBack, onBanksChanged }: BankManagerScreenP
   const [pendingDelete, setPendingDelete] = useState<StoredBank | null>(null);
   const [editing, setEditing] = useState<EditingTarget | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(async () => {
     setBanks(await listBanks());
@@ -89,6 +90,11 @@ export function BankManagerScreen({ onBack, onBanksChanged }: BankManagerScreenP
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  /* Bring the import result into view — it is the next thing to act on. */
+  useEffect(() => {
+    if (preview) previewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [preview]);
 
   const accept = useCallback(
     (payload: unknown, chosenFormat: Format, source?: TabularSource) => {
@@ -313,7 +319,11 @@ export function BankManagerScreen({ onBack, onBanksChanged }: BankManagerScreenP
                           type="button"
                           className="btn btn--sm"
                           title="Open this bank in the editor"
-                          onClick={() => setEditing({ bank: bank.bank })}
+                          onClick={() => {
+                            setEditing({ bank: bank.bank });
+                            setPreview(null);
+                            setIssues([]);
+                          }}
                         >
                           <Pencil size={12} aria-hidden="true" /> Edit
                         </button>
@@ -331,28 +341,6 @@ export function BankManagerScreen({ onBack, onBanksChanged }: BankManagerScreenP
               </tbody>
             </table>
           )}
-        </section>
-
-        <section style={{ marginBottom: 22 }}>
-          <h2 className="dialog__section-title">Edit</h2>
-          <div className="screen__actions" style={{ marginBottom: 8 }}>
-            <button type="button" className="btn" onClick={() => void openForEditing()}>
-              <FolderOpen size={13} aria-hidden="true" /> Open a bank file to edit…
-            </button>
-            <button
-              type="button"
-              className="btn"
-              onClick={() => setEditing({ bank: createEmptyBank() })}
-            >
-              <FilePlus2 size={13} aria-hidden="true" /> Create a new bank
-            </button>
-          </div>
-          <p className="note">
-            The editor writes a question-bank JSON file you can keep, share or re-open later.
-            {supportsFileSystemAccess()
-              ? ' Saving writes back to the same file on your disk.'
-              : ' This browser cannot write files in place, so saving downloads a copy — Chrome or Edge can save directly.'}
-          </p>
         </section>
 
         <section style={{ marginBottom: 22 }}>
@@ -402,7 +390,8 @@ export function BankManagerScreen({ onBack, onBanksChanged }: BankManagerScreenP
               if (file) void handleFile(file);
             }}
           >
-            Drop an Excel workbook (.xlsx), a .csv/.tsv export or a question-bank .json here, or{' '}
+            Drop an Excel workbook (.xlsx), a .csv/.tsv export or a question-bank .json here — including
+            a bank file saved from the editor — or{' '}
             <button
               type="button"
               className="btn btn--sm"
@@ -464,8 +453,31 @@ export function BankManagerScreen({ onBack, onBanksChanged }: BankManagerScreenP
           ) : null}
         </section>
 
+        <section style={{ marginBottom: 22 }}>
+          <h2 className="dialog__section-title">Edit</h2>
+          <div className="screen__actions" style={{ marginBottom: 8 }}>
+            <button type="button" className="btn" onClick={() => void openForEditing()}>
+              <FolderOpen size={13} aria-hidden="true" /> Open a bank file to edit…
+            </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => setEditing({ bank: createEmptyBank() })}
+            >
+              <FilePlus2 size={13} aria-hidden="true" /> Create a new bank
+            </button>
+          </div>
+          <p className="note">
+            Saving in the editor does both halves: it writes a question-bank JSON file you can keep,
+            share or re-open later, <strong>and</strong> updates the copy this app uses for attempts.
+            {supportsFileSystemAccess()
+              ? ' Saving writes back to the same file on your disk.'
+              : ' This browser cannot write files in place, so saving downloads a copy — Chrome or Edge can save directly.'}
+          </p>
+        </section>
+
         {preview ? (
-          <section>
+          <section ref={previewRef}>
             <h2 className="dialog__section-title">Ready to install</h2>
 
             {preview.source ? (
@@ -523,7 +535,13 @@ export function BankManagerScreen({ onBack, onBanksChanged }: BankManagerScreenP
               <button
                 type="button"
                 className="btn"
-                onClick={() => setEditing({ bank: preview.bank })}
+                onClick={() => {
+                  // Drop the preview: it holds the PRE-edit bank, and leaving it
+                  // behind would offer to install the old version over the new.
+                  setEditing({ bank: preview.bank });
+                  setPreview(null);
+                  setIssues([]);
+                }}
               >
                 <Pencil size={13} aria-hidden="true" /> Open in editor
               </button>

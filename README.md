@@ -336,7 +336,11 @@ option that is not present. Fix the spreadsheet, re-export, re-import.
 3. The bank is validated and summarized (title, id, version, question count, years, parts, whether
    an answer key is present, content checksum) **before** anything is stored.
 4. Errors and warnings are listed with the question id and source row.
-5. Press **Install bank** to store it, or **Open in editor** to fix it up first.
+5. Press **Install bank** to add it to the application — no editor involved. Or **Open in editor**
+   to fix it up first.
+
+The import result scrolls into view when it is ready, and a bank file saved from the editor can be
+dropped straight back here.
 
 ### Column names
 
@@ -408,21 +412,41 @@ are the two to live in.
 
 ### Saving
 
-**Save** (or <kbd>Ctrl</kbd>+<kbd>S</kbd>) writes the bank as JSON.
+**Save** (or <kbd>Ctrl</kbd>+<kbd>S</kbd>) does **both** halves of what saving means here:
 
-- In Chrome and Edge it writes back to the same file you opened, in place.
-- Firefox and Safari have no such API, so it downloads a copy instead and says so.
+1. writes the bank as a JSON file, and
+2. updates the copy this application uses for attempts.
+
+That matters, because they are two different places. A bank lives in a file you own *and* in the
+browser's local database, and an edit is only useful once it has reached the second one.
+
+- In Chrome and Edge the file is written back in place, to the same file you opened.
+- Firefox and Safari have no such API, so a copy is downloaded instead and the app says so.
+- If the file write fails, the app copy is still updated — being asked to save and getting neither
+  would be the worst outcome. If you *cancel* the file dialog, nothing is saved at all.
+
+**Save to file** writes to a different location (and links that file for later saves).
+
+A banner at the top of the editor always states where things stand:
+
+| Banner | Meaning |
+| --- | --- |
+| *In this app: up to date* | Attempts started now use exactly what you are looking at |
+| *In this app: out of date* | You have edits the app has not got yet — press Save |
+| *In this app: not added yet* | This bank is not installed; Save adds it |
 
 A dot next to the bank title means unsaved changes; closing with unsaved work asks first, and so
-does reloading the tab. If the bank still has errors, saving asks for confirmation and warns that
-the file will not re-import until they are fixed — it still saves, because losing work is worse.
+does reloading the tab.
 
-**Install into the application** is separate from saving. It stores the bank in this browser so you
-can start an attempt on it, and it refuses banks that fail validation. Editing a file and
-installing it are deliberately two different actions.
+If the bank still has errors, saving asks for confirmation: the **file** is written anyway so work
+in progress is never lost, but the **app copy is not** updated, because installing an invalid bank
+would break the exam screen.
 
-> Bump **bankVersion** (Bank → Bump) whenever you change content. Attempts are tied to a bank by id
-> *and* version, and the checksum guard will otherwise warn that a bank changed underneath them.
+> Bump **bankVersion** (Bank → Bump) whenever you change content meaningfully. Attempts are tied to
+> a bank by id *and* version, and the checksum guard will otherwise warn that a bank changed
+> underneath them. Saving under a new version leaves the old one installed alongside it; saving
+> under the same version replaces it in place, and the editor tells you how many existing attempts
+> were started against the older content.
 
 ---
 
@@ -811,9 +835,14 @@ row, a horizontally scrollable tool strip on the second, and the status rail bec
 Desktop density was not softened to achieve this.
 
 **The editor is a separate mode, not a mode switch.** Banks stay immutable as far as attempts are
-concerned: the editor works on a detached draft, and installing the result is an explicit second
-step. That is why "Save" (to a file) and "Install" (into the app) are two different buttons rather
-than one.
+concerned: the editor works on a detached draft, and nothing an attempt is using changes until you
+save.
+
+Saving deliberately writes to *both* the file and the application's store. An earlier version split
+these into "Save" and "Install into the application", which was architecturally tidy and wrong in
+practice: editing a bank, pressing Save and finding the exam still running the old content is not a
+reasonable thing to ask of anyone. The two destinations are still visible — the sync banner names
+them — but one button covers the common case.
 
 **Images are embedded, not linked.** A bank is meant to be one file you can send someone. A
 relative image path would break the moment it moved, so images become data URLs — with downscaling

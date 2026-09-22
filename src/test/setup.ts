@@ -10,3 +10,10 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
     disconnect(): void {}
   } as unknown as typeof ResizeObserver;
 }
+
+// jsdom implements neither of these, and the editor's download fallback uses
+// them. Stubbing keeps that code path testable.
+if (typeof URL.createObjectURL !== 'function') {
+  URL.createObjectURL = () => 'blob:stub';
+  URL.revokeObjectURL = () => undefined;
+}

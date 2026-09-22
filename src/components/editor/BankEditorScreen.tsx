@@ -23,6 +23,7 @@ import {
 } from '../../state/bankEditor';
 import { bankChecksum } from '../../data/normalize';
 import { questionBankSchema } from '../../data/schema';
+import { getBank, listAttemptMetas } from '../../storage/repositories';
 import { downloadJson } from '../../utils/download';
 import {
   chooseSaveFile,
@@ -43,9 +44,12 @@ export interface BankEditorScreenProps {
   initialHandle?: FileHandleLike | undefined;
   initialFileName?: string | undefined;
   onClose: () => void;
-  /** Install the edited bank into the application's own store. */
+  /** Persist the edited bank into the application's own store. */
   onInstall: (bank: QuestionBank) => Promise<void> | void;
 }
+
+/** How the draft relates to the copy the application has stored. */
+type AppSyncState = 'unknown' | 'absent' | 'in-sync' | 'stale';
 
 type RailFilter = 'all' | 'errors' | 'warnings' | 'nokey' | 'notclean' | 'notes';
 
@@ -110,9 +114,49 @@ export function BankEditorScreen({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [forceSave, setForceSave] = useState<{ blockers: number } | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
+  const [appSync, setAppSync] = useState<AppSyncState>('unknown');
+  const [affectedAttempts, setAffectedAttempts] = useState(0);
+  /** Bumped after a save so the app-sync check re-runs even though the content did not change. */
+  const [syncNonce, setSyncNonce] = useState(0);
   const railRef = useRef<HTMLDivElement>(null);
 
   const dirty = bankChecksum(bank) !== savedChecksum;
+  const currentChecksum = bankChecksum(bank);
+
+  /*
+   * Compare the draft against the copy the application has stored, so the
+   * editor can always say plainly whether the app is up to date. Without this
+   * it is far too easy to edit, save a file, and be left wondering why the exam
+   * still shows the old content.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const stored = await getBank(bank.bankId, bank.bankVersion);
+        if (cancelled) return;
+        if (!stored) {
+          setAppSync('absent');
+          setAffectedAttempts(0);
+          return;
+        }
+        setAppSync(stored.checksum === currentChecksum ? 'in-sync' : 'stale');
+        const attempts = await listAttemptMetas();
+        if (cancelled) return;
+        setAffectedAttempts(
+          attempts.filter(
+            (attempt) =>
+              attempt.bankId === bank.bankId && attempt.bankVersion === bank.bankVersion,
+          ).length,
+        );
+      } catch {
+        if (!cancelled) setAppSync('unknown');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [bank.bankId, bank.bankVersion, currentChecksum, syncNonce]);
 
   const issues = useMemo(() => validateBank(bank), [bank]);
   const errorCount = issues.filter((issue) => issue.level === 'error').length;
@@ -177,72 +221,124 @@ export function BankEditorScreen({
     [bank.bankId, bank.bankVersion],
   );
 
+  /**
+   * Update the copy the application uses for attempts.
+   *
+   * Refuses an invalid bank, because installing one would break the exam side.
+   * Returns a short description of what happened so the caller can build one
+   * combined message instead of flashing two.
+   */
+  const persistToApp = useCallback(async (): Promise<{ ok: boolean; detail: string }> => {
+    const parsed = questionBankSchema.safeParse(bank);
+    if (!parsed.success) {
+      const first = parsed.error.issues[0];
+      return {
+        ok: false,
+        detail:
+          'the copy inside the app was NOT updated, because the bank still has problems' +
+          (first ? ` (${first.path.join('.')}: ${first.message})` : '') +
+          '.',
+      };
+    }
+    try {
+      await onInstall(bank);
+      return { ok: true, detail: 'the app now uses this version.' };
+    } catch (error) {
+      return {
+        ok: false,
+        detail:
+          'the copy inside the app could not be updated: ' +
+          (error instanceof Error ? error.message : 'unknown error') +
+          '.',
+      };
+    }
+  }, [bank, onInstall]);
+
+  /** Write the bank to disk. Returns how it was written, or null if cancelled. */
   const writeFile = useCallback(
-    async (target?: FileHandleLike) => {
+    async (mode: 'current' | 'choose'): Promise<string | null> => {
       const contents = serialize(bank);
 
-      if (target) {
-        const allowed = await ensureWritePermission(target);
+      if (mode === 'current' && handle) {
+        const allowed = await ensureWritePermission(handle);
         if (!allowed) {
           setMessage({
             level: 'error',
-            text: 'Permission to write that file was declined. Use "Save as" to pick a location.',
+            text: 'Permission to write that file was declined. Use "Save to file" to pick a location.',
           });
-          return false;
+          return null;
         }
-        await writeToHandle(target, contents);
-        setHandle(target);
-        setFileName(target.name);
-      } else {
-        // No File System Access API: fall back to a download.
-        downloadJson(suggestedFileName(), bank);
+        await writeToHandle(handle, contents);
+        return `Saved to ${handle.name}`;
       }
 
-      setSavedChecksum(bankChecksum(bank));
-      setMessage({
-        level: 'ok',
-        text: target
-          ? `Saved to ${target.name}.`
-          : `Downloaded ${suggestedFileName()} — your browser cannot write files in place, ` +
-            'so this saved a copy to your downloads folder.',
-      });
-      return true;
+      if (supportsFileSystemAccess()) {
+        try {
+          const chosen = await chooseSaveFile(suggestedFileName());
+          if (!chosen) return null; // the user cancelled the dialog
+          await writeToHandle(chosen, contents);
+          setHandle(chosen);
+          setFileName(chosen.name);
+          return `Saved to ${chosen.name}`;
+        } catch {
+          // The picker can fail for reasons that are not the user's doing — no
+          // user gesture, a sandboxed frame, a headless browser. Never strand
+          // the work: fall through to a download.
+        }
+      }
+
+      const name = suggestedFileName();
+      downloadJson(name, bank);
+      setFileName(name);
+      return `Downloaded ${name} (this browser cannot write files in place)`;
     },
-    [bank, serialize, suggestedFileName],
+    [bank, handle, serialize, suggestedFileName],
   );
 
+  /**
+   * Save.
+   *
+   * Deliberately does BOTH halves of what "save" means here: it writes the file
+   * AND updates the copy the application uses for attempts. Keeping those as
+   * two separate buttons was a mistake — editing a bank, pressing Save and
+   * finding the exam still showing the old content is not a reasonable thing to
+   * ask of anyone.
+   */
   const doSave = useCallback(
-    async (options: { saveAs?: boolean; force?: boolean } = {}) => {
+    async (options: { chooseFile?: boolean; force?: boolean } = {}) => {
       if (errorCount > 0 && !options.force) {
         setForceSave({ blockers: errorCount });
         return;
       }
+      /*
+       * The two halves are independent on purpose. Cancelling the file dialog
+       * means "never mind" and stops everything, but a file write that FAILS
+       * must not also block the app copy from updating — the user asked to
+       * save, and getting neither is the worst outcome.
+       */
+      let fileResult: string;
+      let fileFailed = false;
       try {
-        if (!options.saveAs && handle) {
-          await writeFile(handle);
-          return;
-        }
-        if (supportsFileSystemAccess()) {
-          try {
-            const chosen = await chooseSaveFile(suggestedFileName());
-            if (!chosen) return; // user cancelled
-            await writeFile(chosen);
-            return;
-          } catch {
-            // The picker can fail for reasons that are not the user's doing —
-            // no user gesture, a sandboxed frame, a headless browser. Never let
-            // that strand the user's work: fall through to a download.
-          }
-        }
-        await writeFile(undefined);
+        const written = await writeFile(options.chooseFile ? 'choose' : 'current');
+        if (written === null) return; // cancelled, or already reported
+        fileResult = written;
       } catch (error) {
-        setMessage({
-          level: 'error',
-          text: error instanceof Error ? `Could not save: ${error.message}` : 'Could not save the file.',
-        });
+        fileFailed = true;
+        fileResult =
+          'The file could NOT be written' +
+          (error instanceof Error ? ` (${error.message})` : '') +
+          ', but';
       }
+
+      const appResult = await persistToApp();
+      if (!fileFailed) setSavedChecksum(bankChecksum(bank));
+      setSyncNonce((nonce) => nonce + 1);
+      setMessage({
+        level: fileFailed || !appResult.ok ? (fileFailed && !appResult.ok ? 'error' : 'warn') : 'ok',
+        text: `${fileResult} — ${appResult.detail}`,
+      });
     },
-    [errorCount, handle, suggestedFileName, writeFile],
+    [bank, errorCount, persistToApp, writeFile],
   );
 
   /* Ctrl/Cmd+S saves; Alt+Arrow moves between questions without disturbing text entry. */
@@ -265,34 +361,6 @@ export function BankEditorScreen({
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [doSave, step]);
-
-  const install = useCallback(async () => {
-    const parsed = questionBankSchema.safeParse(bank);
-    if (!parsed.success) {
-      setMessage({
-        level: 'error',
-        text:
-          'This bank cannot be installed until its problems are fixed: ' +
-          parsed.error.issues
-            .slice(0, 3)
-            .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
-            .join('; '),
-      });
-      return;
-    }
-    try {
-      await onInstall(bank);
-      setMessage({
-        level: 'ok',
-        text: `Installed "${bank.title}" version ${bank.bankVersion} into the application.`,
-      });
-    } catch (error) {
-      setMessage({
-        level: 'error',
-        text: error instanceof Error ? error.message : 'Could not install the bank.',
-      });
-    }
-  }, [bank, onInstall]);
 
   const requestClose = () => {
     if (!dirty) {
@@ -378,7 +446,7 @@ export function BankEditorScreen({
                 <span className="sr-only">{dirty ? ' (unsaved changes)' : ''}</span>
               </div>
               <div className="editor-identity__file">
-                {fileName ?? 'not saved to a file yet'} ·{' '}
+                {fileName ? (handle ? fileName : `${fileName} (downloads a copy)`) : 'no file yet'} ·{' '}
                 {current ? `${currentIndex + 1} of ${bank.questions.length}` : 'no question'}
                 {current ? ` · ${current.id}` : ''}
               </div>
@@ -474,17 +542,17 @@ export function BankEditorScreen({
             <button
               type="button"
               className="toolitem"
-              onClick={() => void doSave({ saveAs: true })}
-              title="Save to a new file"
+              onClick={() => void doSave({ chooseFile: true })}
+              title="Write to a different file, and update the app"
             >
               <Download size={19} aria-hidden="true" />
-              <span className="toolitem__label">Save as</span>
+              <span className="toolitem__label">Save to file</span>
             </button>
             <button
               type="button"
               className={cn('toolitem', dirty && 'toolitem--active')}
               onClick={() => void doSave()}
-              title="Save to the current file (Ctrl+S)"
+              title="Save the bank: writes the file and updates the app (Ctrl+S)"
             >
               <Save size={19} aria-hidden="true" />
               <span className="toolitem__label">Save</span>
@@ -514,6 +582,49 @@ export function BankEditorScreen({
               </button>
             </div>
           ) : null}
+
+          {/*
+            * Always say plainly whether the app is running this version. The
+            * single most confusing thing about an editor like this is not
+            * knowing whether your change reached the thing you are testing.
+            */}
+          <div
+            className={cn(
+              'banner',
+              'editor-sync',
+              appSync === 'in-sync' && 'banner--ok',
+              appSync === 'stale' && 'banner--warn',
+              (appSync === 'absent' || appSync === 'unknown') && 'banner--info',
+            )}
+            style={{ marginBottom: 14, maxWidth: 980 }}
+          >
+            {appSync === 'in-sync' ? (
+              <>
+                <strong>In this app: up to date.</strong> Attempts started now use this version.
+              </>
+            ) : appSync === 'stale' ? (
+              <>
+                <strong>In this app: out of date.</strong> The app still has an older copy of{' '}
+                <code>{bank.bankId}</code> v{bank.bankVersion} — press <strong>Save</strong> to
+                update it.
+              </>
+            ) : appSync === 'absent' ? (
+              <>
+                <strong>In this app: not added yet.</strong> <code>{bank.bankId}</code> v
+                {bank.bankVersion} is not installed — <strong>Save</strong> writes the file and adds
+                it so you can start an attempt on it.
+              </>
+            ) : (
+              <>Checking whether the app has this bank…</>
+            )}
+            {affectedAttempts > 0 && appSync === 'stale' ? (
+              <>
+                {' '}
+                {affectedAttempts} existing attempt{affectedAttempts === 1 ? '' : 's'} were started
+                against the older content; start a new attempt to use the updated questions.
+              </>
+            ) : null}
+          </div>
 
           {errorCount > 0 ? (
             <div className="banner banner--warn" style={{ marginBottom: 14, maxWidth: 980 }}>
@@ -549,15 +660,6 @@ export function BankEditorScreen({
             />
           )}
 
-          <div style={{ maxWidth: 980, marginTop: 26, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button type="button" className="btn btn--primary" onClick={() => void install()}>
-              Install into the application
-            </button>
-            <span className="note" style={{ alignSelf: 'center' }}>
-              Saves the bank into this browser so you can start an attempt on it. Editing a file and
-              installing it are separate steps.
-            </span>
-          </div>
         </main>
       </div>
 
@@ -631,12 +733,13 @@ export function BankEditorScreen({
       >
         <p className="note">
           This bank has {forceSave?.blockers} problem
-          {forceSave?.blockers === 1 ? '' : 's'} that will stop the file being re-imported — for
-          example a duplicate question id or an answer key pointing at a missing option.
+          {forceSave?.blockers === 1 ? '' : 's'} — for example a duplicate question id or an answer
+          key pointing at a missing option.
         </p>
         <p className="note" style={{ marginTop: 8 }}>
-          Saving anyway keeps your work in progress, but you will need to fix those before the file
-          can be loaded again.
+          The <strong>file</strong> will still be written, so your work in progress is kept. The
+          copy the app uses for attempts will <strong>not</strong> be updated until the problems are
+          fixed, because an invalid bank would break the exam screen.
         </p>
       </ConfirmDialog>
     </div>

@@ -56,7 +56,15 @@ export function isLocked(attempt: Attempt, questionId: string): boolean {
   if (attempt.mode !== 'tutor') return false;
   const response = attempt.responses[questionId];
   if (!response) return false;
-  return response.status === 'correct' || response.status === 'incorrect' || Boolean(response.ungradable && response.gradedAt);
+  /*
+   * Tutor mode locks a question once its result has been revealed, so an answer
+   * cannot be changed after seeing whether it was right.
+   *
+   * A question with no answer key reveals nothing, so there is nothing to
+   * protect and it stays editable. It also means that adding a key to the bank
+   * later is not defeated by answers that were locked while the key was absent.
+   */
+  return response.status === 'correct' || response.status === 'incorrect';
 }
 
 function withResponse(

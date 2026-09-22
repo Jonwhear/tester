@@ -1,8 +1,9 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { QuestionBank } from '../../types/question';
+import { clearAllData, saveBank } from '../../storage/repositories';
 import { BankEditorScreen } from '../editor/BankEditorScreen';
 
 function bank(): QuestionBank {
@@ -47,6 +48,10 @@ function renderEditor(overrides: Partial<React.ComponentProps<typeof BankEditorS
   };
   return { ...render(<BankEditorScreen {...props} />), props };
 }
+
+beforeEach(async () => {
+  await clearAllData();
+});
 
 describe('BankEditorScreen', () => {
   it('opens on the first question and lists them all in the rail', () => {
@@ -156,27 +161,75 @@ describe('BankEditorScreen', () => {
     expect(container.querySelectorAll('.rail__row')).toHaveLength(2);
   });
 
-  it('refuses to install a bank that would fail validation', async () => {
+  it('Save updates the copy the app uses, not just a file', async () => {
+    const user = userEvent.setup();
+    const onInstall = vi.fn();
+    renderEditor({ onInstall });
+
+    await user.click(screen.getByLabelText('Mark option C correct'));
+    await user.click(screen.getByTitle(/Save the bank/));
+
+    // The whole point of the fix: saving reaches the application's own store.
+    expect(onInstall).toHaveBeenCalledTimes(1);
+    expect(onInstall.mock.calls[0]?.[0]).toMatchObject({
+      bankId: 'edit-ui',
+      questions: expect.arrayContaining([expect.objectContaining({ correctAnswer: ['C'] })]),
+    });
+    expect(await screen.findByText(/the app now uses this version/)).toBeInTheDocument();
+  });
+
+  it('writes the file but refuses to update the app when the bank is invalid', async () => {
     const user = userEvent.setup();
     const onInstall = vi.fn();
     renderEditor({ onInstall });
 
     const labelB = screen.getByLabelText('Option 2 label');
-    await user.clear(labelB); // empty label is invalid
+    await user.clear(labelB); // an empty label is invalid
 
-    await user.click(screen.getByRole('button', { name: /Install into the application/ }));
+    await user.click(screen.getByTitle(/Save the bank/));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/will still be written/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Save anyway' }));
+
     expect(onInstall).not.toHaveBeenCalled();
-    expect(await screen.findByText(/cannot be installed until its problems are fixed/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/the copy inside the app was NOT updated/),
+    ).toBeInTheDocument();
   });
 
-  it('installs a valid bank', async () => {
-    const user = userEvent.setup();
-    const onInstall = vi.fn();
-    renderEditor({ onInstall });
+  it('tells you whether the app is running this version', async () => {
+    renderEditor();
+    // getBank() finds nothing for this draft in the test database.
+    expect(await screen.findByText(/In this app: not added yet/)).toBeInTheDocument();
+  });
 
-    await user.click(screen.getByRole('button', { name: /Install into the application/ }));
-    expect(onInstall).toHaveBeenCalledTimes(1);
-    expect(onInstall.mock.calls[0]?.[0]).toMatchObject({ bankId: 'edit-ui' });
+  it('reports the app as out of date once an edit diverges from the stored copy', async () => {
+    const user = userEvent.setup();
+    await saveBank(bank());
+    renderEditor();
+
+    expect(await screen.findByText(/In this app: up to date/)).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText('Mark option C correct'));
+    expect(await screen.findByText(/In this app: out of date/)).toBeInTheDocument();
+  });
+
+  it('refreshes the sync banner after saving, not just after editing', async () => {
+    const user = userEvent.setup();
+    await saveBank(bank());
+    // A real install, so the stored checksum actually moves.
+    renderEditor({ onInstall: async (next) => void (await saveBank(next)) });
+
+    await user.click(screen.getByLabelText('Mark option C correct'));
+    expect(await screen.findByText(/In this app: out of date/)).toBeInTheDocument();
+
+    await user.click(screen.getByTitle(/Save the bank/));
+
+    // Saving does not change the bank's content, so the banner only updates if
+    // the check is explicitly re-run after a save.
+    await waitFor(() =>
+      expect(screen.getByText(/In this app: up to date/)).toBeInTheDocument(),
+    );
   });
 
   it('closes immediately when nothing has changed', async () => {
